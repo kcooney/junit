@@ -34,12 +34,13 @@ public class StackFilterTest extends TestCase {
 
         StringWriter swout = new StringWriter();
         PrintWriter pwout = new PrintWriter(swout);
-        pwout.println("junit.framework.AssertionFailedError");
-        pwout.println("\tat junit.framework.Assert.fail(Assert.java:144)");
-        pwout.println("\tat junit.framework.Assert.assert(Assert.java:19)");
-        pwout.println("\tat junit.framework.Assert.assert(Assert.java:26)");
-        pwout.println("\tat MyTest.f(MyTest.java:13)");
-        pwout.println("\tat MyTest.testStackTrace(MyTest.java:8)");
+        // need to introduce \n as line ending for cross platform compatibility
+        pwout.print("junit.framework.AssertionFailedError\n");
+        pwout.print("\tat junit.framework.Assert.fail(Assert.java:144)\n");
+        pwout.print("\tat junit.framework.Assert.assert(Assert.java:19)\n");
+        pwout.print("\tat junit.framework.Assert.assert(Assert.java:26)\n");
+        pwout.print("\tat MyTest.f(MyTest.java:13)\n");
+        pwout.print("\tat MyTest.testStackTrace(MyTest.java:8)\n");
         fFiltered = swout.toString();
     }
 
