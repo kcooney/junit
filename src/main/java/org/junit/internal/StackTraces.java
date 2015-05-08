@@ -41,44 +41,57 @@ public class StackTraces {
         return trimStackTrace("", fullTrace);
     }
 
-    static String trimStackTrace(String extracedExceptionMessage, String fullTrace) {
-        StringBuilder trimmedTrace = new StringBuilder(extracedExceptionMessage);
+    static String trimStackTrace(String extractedExceptionMessage, String fullTrace) {
+        StringBuilder trimmedTrace = new StringBuilder(extractedExceptionMessage);
         BufferedReader reader = new BufferedReader(
-            new StringReader(fullTrace.substring(extracedExceptionMessage.length())));
+            new StringReader(fullTrace.substring(extractedExceptionMessage.length())));
 
         try {
-            // Collect the stack trace lines for "exception" (but not the cause).
             List<String> stackTraceLines = new ArrayList<String>();
-            String line;
-            boolean hasCause = false;
-            while ((line = reader.readLine()) != null) {
-                if (line.startsWith("Caused by: ")) {
-                    hasCause= true;
-                    break;
-                }
-                stackTraceLines.add(line);
-            }
+            List<String> remainingLines = new ArrayList<String>();
+            collectStackTraceLines(reader, stackTraceLines, remainingLines);
+            boolean hasCause = remainingLines.size()>0;
             if (stackTraceLines.isEmpty()) {
                 // No stack trace?
                 return fullTrace;
             }
+            
             stackTraceLines = trimStackTraceLines(stackTraceLines, hasCause);
+            
             if (stackTraceLines.isEmpty()) {
                 // Could not trim stack trace lines.
                 return fullTrace;
             }
+            
             appendStackTraceLines(stackTraceLines, trimmedTrace);
-            if (line != null) {
-                // Print remaining stack trace lines.
-                do {
-                    trimmedTrace.append(line).append("\n");
-                    line = reader.readLine();
-                } while (line != null);
-            }
+            appendStackTraceLines(remainingLines, trimmedTrace);
+            
             return trimmedTrace.toString();
         } catch (IOException e) {
         }
         return fullTrace;
+    }
+
+    // Collect the stack trace lines for "exception" (but not the cause).
+    private static void collectStackTraceLines(BufferedReader reader,
+            List<String> stackTraceLines, List<String> remainingLines) throws IOException {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.startsWith("Caused by: ")) {
+                remainingLines.add(line);
+                addRemainingLines(reader, remainingLines);
+                break;
+            }
+            stackTraceLines.add(line);
+        }
+    }
+
+    private static void addRemainingLines(BufferedReader reader,
+            List<String> remainingLines) throws IOException {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            remainingLines.add(line);
+        }
     }
 
     private static void appendStackTraceLines(
@@ -95,17 +108,22 @@ public class StackTraces {
         for (String stackTraceLine : asReversedList(stackTraceLines)) {
             state = state.processLine(stackTraceLine);
             if (state == State.DONE) {
-                List<String> trimmedLines = stackTraceLines.subList(0, linesToInclude);
-                if (!hasCause) {
-                    return trimmedLines;
-                }
-                List<String> copy = new ArrayList<String>(trimmedLines);
-                copy.add("\t..." + (stackTraceLines.size() - copy.size()) + "more");
-                return copy;
+                return linesToInclude(stackTraceLines, hasCause, linesToInclude);
             }
             linesToInclude--;
         }
         return Collections.emptyList();
+    }
+
+    private static List<String> linesToInclude(List<String> stackTraceLines,
+            boolean hasCause, int linesToInclude) {
+        List<String> trimmedLines = stackTraceLines.subList(0, linesToInclude);
+        if (!hasCause) {
+            return trimmedLines;
+        }
+        List<String> copy = new ArrayList<String>(trimmedLines);
+        copy.add("\t..." + (stackTraceLines.size() - copy.size()) + "more");
+        return copy;
     }
 
     private static <T> List<T> asReversedList(final List<T> list) {
