@@ -63,14 +63,26 @@ public class TestClass implements Annotatable {
     protected void scanAnnotatedMembers(Map<Class<? extends Annotation>, List<FrameworkMethod>> methodsForAnnotations, Map<Class<? extends Annotation>, List<FrameworkField>> fieldsForAnnotations) {
         for (Class<?> eachClass : getSuperClasses(clazz)) {
             for (Method eachMethod : MethodSorter.getDeclaredMethods(eachClass)) {
-                addToAnnotationLists(new FrameworkMethod(eachMethod), methodsForAnnotations);
+                FrameworkMethod method = new FrameworkMethod(eachMethod);
+                Iterable<Annotation>  annotations = getAnnotations(method);
+                addToAnnotationLists(method, annotations, methodsForAnnotations);
             }
             // ensuring fields are sorted to make sure that entries are inserted
             // and read from fieldForAnnotations in a deterministic order
             for (Field eachField : getSortedDeclaredFields(eachClass)) {
-                addToAnnotationLists(new FrameworkField(eachField), fieldsForAnnotations);
+                FrameworkField field = new FrameworkField(eachField);
+                Iterable<Annotation> annotations = getAnnotations(field);
+                addToAnnotationLists(field, annotations, fieldsForAnnotations);
             }
         }
+    }
+ 
+    protected Iterable<Annotation> getAnnotations(FrameworkMethod method) {
+        return Arrays.asList(method.getAnnotations());
+    }
+
+    protected Iterable<Annotation>  getAnnotations(FrameworkField field) {
+        return Arrays.asList(field.getAnnotations());
     }
 
     private static Field[] getSortedDeclaredFields(Class<?> clazz) {
@@ -81,7 +93,12 @@ public class TestClass implements Annotatable {
 
     protected static <T extends FrameworkMember<T>> void addToAnnotationLists(T member,
             Map<Class<? extends Annotation>, List<T>> map) {
-        for (Annotation each : member.getAnnotations()) {
+        addToAnnotationLists(member, Arrays.asList(member.getAnnotations()), map);
+    }
+
+    private static <T extends FrameworkMember<T>> void addToAnnotationLists(T member,
+            Iterable<Annotation>  annotations, Map<Class<? extends Annotation>, List<T>> map) {
+        for (Annotation each : annotations) {
             Class<? extends Annotation> type = each.annotationType();
             List<T> members = getAnnotatedMembers(map, type, true);
             if (member.isShadowedBy(members)) {

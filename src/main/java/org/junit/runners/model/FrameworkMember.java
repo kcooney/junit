@@ -10,7 +10,7 @@ import java.util.List;
  */
 public abstract class FrameworkMember<T extends FrameworkMember<T>> implements
         Annotatable {
-    abstract boolean isShadowedBy(T otherMember);
+    protected abstract boolean isShadowedBy(T otherMember);
 
     boolean isShadowedBy(List<T> members) {
         for (T each : members) {
