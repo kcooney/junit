@@ -1,17 +1,23 @@
 package org.junit.samples;
 
 import static org.junit.Assert.assertEquals;
-
 import junit.framework.JUnit4TestAdapter;
 import org.junit.Before;
+import org.junit.JUnit;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Some simple tests.
  */
+@JUnit
 public class SimpleTest {
     protected int fValue1;
     protected int fValue2;
+
+    @Rule
+    public final TemporaryFolder folder = new TemporaryFolder();
 
     @Before
     public void setUp() {
