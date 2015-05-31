@@ -5,6 +5,7 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -245,10 +246,23 @@ public class AssertionTest {
     @Test
     public void stringsDifferWithUserMessage() {
         try {
-            assertEquals("not equal", "one", "two");
-        } catch (Throwable exception) {
-            assertEquals("not equal expected:<[one]> but was:<[two]>", exception.getMessage());
+            assertEquals("not equal", "one!", "two!");
+        } catch (ComparisonFailure exception) {
+            assertEquals("not equal expected:<[one]!> but was:<[two]!>", exception.getMessage());
+            return;
         }
+        fail("expected ComparisonFailure");
+    }
+
+    @Test
+    public void stringBuffersDifferWithUserMessage() {
+        try {
+            assertEquals("not equal", new StringBuffer("one!"), new StringBuffer("two!"));
+        } catch (ComparisonFailure exception) {
+            assertEquals("not equal expected:<[one]!> but was:<[two]!>", exception.getMessage());
+            return;
+        }
+        fail("expected ComparisonFailure");
     }
 
     @Test
@@ -319,9 +333,49 @@ public class AssertionTest {
         assertEquals(new Object(), new Object());
     }
 
-    @Test(expected = ComparisonFailure.class)
+    @Test
     public void stringsNotEqual() {
-        assertEquals("abc", "def");
+        try {
+            assertEquals("abc", "def");
+        } catch (ComparisonFailure expected) {
+            assertTrue("expected ComparisonFailure", expected.getClass() == ComparisonFailure.class);
+            return;
+        }
+        fail("expected ComparisonFailure");
+    }
+
+    @Test
+    public void stringBuffersNotEqual() {
+        try {
+            assertEquals(new StringBuffer("abc"), new StringBuffer("def"));
+        } catch (ComparisonFailure expected) {
+            assertTrue("expected ComparisonFailure", expected.getClass() == ComparisonFailure.class);
+            return;
+        }
+        fail("expected ComparisonFailure");
+    }
+
+    @Test
+    public void stringBufferAndStringWithSameToStringValue() {
+        try {
+            assertEquals("abc", new StringBuffer("abc"));
+        } catch (AssertionError expected) {
+            assertEquals("expected: java.lang.String<abc> but was: java.lang.StringBuffer<abc>",
+                    expected.getMessage());
+            return;
+        }
+        fail("expected ComparisonFailure");
+    }
+
+    @Test
+    public void longObjectsNotEqual() {
+        try {
+            assertEquals(Long.valueOf(123), Long.valueOf(456));
+        } catch (ComparisonFailure expected) {
+            assertFalse("expected GenericComparisonFailure", expected.getClass() == ComparisonFailure.class);
+            return;
+        }
+        fail("expected ComparisonFailure");
     }
 
     @Test(expected = AssertionError.class)
@@ -496,6 +550,13 @@ public class AssertionTest {
             fail();
         } catch (ComparisonFailure e) {
             assertEquals("expected:<[a]> but was:<[b]>", e.getMessage());
+        }
+
+        try {
+            assertEquals(null, Long.valueOf(1), Long.valueOf(2));
+            fail();
+        } catch (ComparisonFailure e) {
+            assertEquals("expected:<1> but was:<2>", e.getMessage());
         }
     }
 
