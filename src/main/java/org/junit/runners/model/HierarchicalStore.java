@@ -1,11 +1,11 @@
 package org.junit.runners.model;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class HierarchicalStore extends Store {
     private final Store parentStore;
-    private final Map<Object, StoredValue> values = new HashMap<Object, StoredValue>();
+    private final ConcurrentMap<Object, StoredValue> values = new ConcurrentHashMap<Object, StoredValue>();
 
     public HierarchicalStore(Store parentStore) {
         this.parentStore = parentStore;
@@ -41,6 +41,7 @@ public class HierarchicalStore extends Store {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> T remove(Key<T> key) {
         StoredValue previousValue = values.remove(key);
