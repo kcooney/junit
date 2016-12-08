@@ -43,7 +43,7 @@ public class AllDefaultPossibilitiesBuilder extends RunnerBuilder {
     }
 
     protected JUnit4Builder junit4Builder() {
-        return new JUnit4Builder();
+        return new JUnit4Builder(this);
     }
 
     protected JUnit3Builder junit3Builder() {

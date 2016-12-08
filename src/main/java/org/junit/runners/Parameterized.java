@@ -13,6 +13,9 @@ import java.util.List;
 
 import org.junit.runner.Runner;
 import org.junit.runners.model.FrameworkMethod;
+import org.junit.runners.model.HierarchicalStore;
+import org.junit.runners.model.RunnerBuilder;
+import org.junit.runners.model.Store;
 import org.junit.runners.model.TestClass;
 import org.junit.runners.parameterized.BlockJUnit4ClassRunnerWithParametersFactory;
 import org.junit.runners.parameterized.ParametersRunnerFactory;
@@ -237,22 +240,40 @@ public class Parameterized extends Suite {
     /**
      * Only called reflectively. Do not use programmatically.
      */
+    @Deprecated
     public Parameterized(Class<?> klass) throws Throwable {
         super(klass, RunnersFactory.createRunnersForClass(klass));
+    }
+ 
+    /**
+     * Only called reflectively. Do not use programmatically.
+     *
+     * @since 4.13
+     */
+    public Parameterized(Class<?> klass, RunnerBuilder builder) throws Throwable {
+        super(builder, klass, RunnersFactory.createRunnersForClass(klass, builder.getStore()));
     }
 
     private static class RunnersFactory {
         private static final ParametersRunnerFactory DEFAULT_FACTORY = new BlockJUnit4ClassRunnerWithParametersFactory();
 
         private final TestClass testClass;
+        private final Store store;
 
         static List<Runner> createRunnersForClass(Class<?> klass)
                 throws Throwable {
-            return new RunnersFactory(klass).createRunners();
+            return createRunnersForClass(klass, new HierarchicalStore());
         }
 
-        private RunnersFactory(Class<?> klass) {
+        static List<Runner> createRunnersForClass(Class<?> klass, Store store)
+                throws Throwable {
+            return new RunnersFactory(klass, store).createRunners();
+        }
+
+
+        private RunnersFactory(Class<?> klass, Store store) {
             testClass = new TestClass(klass);
+            this.store = store;
         }
 
         private List<Runner> createRunners() throws Throwable {
@@ -280,8 +301,7 @@ public class Parameterized extends Suite {
                 String pattern, int index, Object parametersOrSingleParameter) {
             Object[] parameters = (parametersOrSingleParameter instanceof Object[]) ? (Object[]) parametersOrSingleParameter
                     : new Object[] { parametersOrSingleParameter };
-            return createTestWithParameters(testClass, pattern, index,
-                    parameters);
+            return createTestWithParameters(pattern, index, parameters);
         }
 
         @SuppressWarnings("unchecked")
@@ -348,13 +368,12 @@ public class Parameterized extends Suite {
         }
 
         private TestWithParameters createTestWithParameters(
-                TestClass testClass, String pattern, int index,
-                Object[] parameters) {
+                String pattern, int index, Object[] parameters) {
             String finalPattern = pattern.replaceAll("\\{index\\}",
                     Integer.toString(index));
             String name = MessageFormat.format(finalPattern, parameters);
             return new TestWithParameters("[" + name + "]", testClass,
-                    Arrays.asList(parameters));
+                    Arrays.asList(parameters), store);
         }
     }
 }

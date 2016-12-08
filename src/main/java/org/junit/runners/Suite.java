@@ -78,7 +78,7 @@ public class Suite extends ParentRunner<Runner> {
      * @param classes the classes in the suite
      */
     public Suite(RunnerBuilder builder, Class<?>[] classes) throws InitializationError {
-        this(null, builder.runners(null, classes));
+        this(builder, null, builder.runners(null, classes));
     }
 
     /**
@@ -87,6 +87,7 @@ public class Suite extends ParentRunner<Runner> {
      * @param klass the root of the suite
      * @param suiteClasses the classes in the suite
      */
+    @Deprecated
     protected Suite(Class<?> klass, Class<?>[] suiteClasses) throws InitializationError {
         this(new AllDefaultPossibilitiesBuilder(), klass, suiteClasses);
     }
@@ -99,7 +100,7 @@ public class Suite extends ParentRunner<Runner> {
      * @param suiteClasses the classes in the suite
      */
     protected Suite(RunnerBuilder builder, Class<?> klass, Class<?>[] suiteClasses) throws InitializationError {
-        this(klass, builder.runners(klass, suiteClasses));
+        this(builder, klass, builder.runners(klass, suiteClasses));
     }
 
     /**
@@ -108,8 +109,15 @@ public class Suite extends ParentRunner<Runner> {
      * @param klass root of the suite
      * @param runners for each class in the suite, a {@link Runner}
      */
+    @Deprecated
     protected Suite(Class<?> klass, List<Runner> runners) throws InitializationError {
         super(klass);
+        this.runners = Collections.unmodifiableList(runners);
+    }
+
+    /** @since 4.13 */
+    Suite(RunnerBuilder builder, Class<?> klass, List<Runner> runners) throws InitializationError {
+        super(klass, builder);
         this.runners = Collections.unmodifiableList(runners);
     }
 

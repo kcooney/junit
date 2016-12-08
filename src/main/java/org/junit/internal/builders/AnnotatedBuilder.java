@@ -4,8 +4,10 @@ import org.junit.runner.RunWith;
 import org.junit.runner.Runner;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
+import org.junit.runners.model.Store;
 
 import java.lang.reflect.Modifier;
+import java.util.List;
 
 
 /**
@@ -104,13 +106,52 @@ public class AnnotatedBuilder extends RunnerBuilder {
             return runnerClass.getConstructor(Class.class).newInstance(testClass);
         } catch (NoSuchMethodException e) {
             try {
+                // Cache the Store just in case the caller caches the runner builder
+                RunnerBuilder wrapper = new RunnerBuilderWrapper(suiteBuilder, suiteBuilder.getStore());
                 return runnerClass.getConstructor(Class.class,
-                        RunnerBuilder.class).newInstance(testClass, suiteBuilder);
+                        RunnerBuilder.class).newInstance(testClass, wrapper);
             } catch (NoSuchMethodException e2) {
                 String simpleName = runnerClass.getSimpleName();
                 throw new InitializationError(String.format(
                         CONSTRUCTOR_ERROR_FORMAT, simpleName, simpleName));
             }
+        }
+    }
+ 
+    private static class RunnerBuilderWrapper extends RunnerBuilder {
+        private final RunnerBuilder delegate;
+        private final Store store;
+
+        public RunnerBuilderWrapper(RunnerBuilder delegate, Store store) {
+            this.delegate = delegate;
+            this.store = store;
+        }
+
+        @Override
+        public Runner runnerForClass(Class<?> testClass) throws Throwable {
+            return delegate.safeRunnerForClass(testClass);
+        }
+
+        @Override
+        public Runner safeRunnerForClass(Class<?> testClass) {
+            return delegate.safeRunnerForClass(testClass);
+        }
+
+        @Override
+        public Store getStore() {
+            return store;
+        }
+
+        @Override
+        public List<Runner> runners(Class<?> parent, Class<?>[] children)
+                throws InitializationError {
+            return delegate.runners(parent, children);
+        }
+
+        @Override
+        public List<Runner> runners(Class<?> parent, List<Class<?>> children)
+                throws InitializationError {
+            return runners(parent, children);
         }
     }
 }

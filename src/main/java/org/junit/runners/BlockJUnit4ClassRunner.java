@@ -29,7 +29,9 @@ import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.MultipleFailureException;
+import org.junit.runners.model.RunnerBuilder;
 import org.junit.runners.model.Statement;
+import org.junit.runners.model.Store;
 
 /**
  * Implements the JUnit 4 standard test case class model, as defined by the
@@ -63,9 +65,33 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
      * Creates a BlockJUnit4ClassRunner to run {@code testClass}
      *
      * @throws InitializationError if the test class is malformed.
+     
      */
+    @Deprecated
     public BlockJUnit4ClassRunner(Class<?> testClass) throws InitializationError {
         super(testClass);
+    }
+
+    /**
+     * Creates a BlockJUnit4ClassRunner to run {@code testClass} using the given builder.
+     *
+     * @throws InitializationError if the test class is malformed.
+     * @since 4.13
+     */
+    public BlockJUnit4ClassRunner(Class<?> testClass, RunnerBuilder runnerBuilder) throws InitializationError {
+        this(testClass, runnerBuilder.getStore());
+    }
+ 
+    /**
+     * Creates a BlockJUnit4ClassRunner to run {@code testClass} using the given store.
+     *
+     * @throws InitializationError if the test class is malformed.
+     * @since 4.13
+     * @deprecated use {@link #BlockJUnit4ClassRunner(Class, RunnerBuilder)}
+     */
+    @Deprecated
+    public BlockJUnit4ClassRunner(Class<?> testClass, Store store) throws InitializationError {
+        super(testClass, store);
     }
 
     //

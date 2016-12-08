@@ -1,7 +1,9 @@
 package org.junit.runners.model;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -38,6 +40,7 @@ import org.junit.runner.Runner;
  */
 public abstract class RunnerBuilder {
     private final Set<Class<?>> parents = new HashSet<Class<?>>();
+    private final List<Store> storeStack = new LinkedList<Store>(Arrays.asList(new HierarchicalStore()));
 
     /**
      * Override to calculate the correct runner for a test class at runtime.
@@ -69,15 +72,22 @@ public abstract class RunnerBuilder {
         }
     }
 
+    /** Gets the current {@link Store} */
+    public Store getStore() {
+        return storeStack.get(0);
+    }
+
     Class<?> addParent(Class<?> parent) throws InitializationError {
         if (!parents.add(parent)) {
             throw new InitializationError(String.format("class '%s' (possibly indirectly) contains itself as a SuiteClass", parent.getName()));
         }
+        storeStack.add(0, new HierarchicalStore(getStore()));
         return parent;
     }
 
     void removeParent(Class<?> klass) {
         parents.remove(klass);
+        storeStack.remove(0);
     }
 
     /**

@@ -14,8 +14,11 @@ import org.junit.experimental.theories.internal.ParameterizedAssertionError;
 import org.junit.internal.AssumptionViolatedException;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.FrameworkMethod;
+import org.junit.runners.model.HierarchicalStore;
 import org.junit.runners.model.InitializationError;
+import org.junit.runners.model.RunnerBuilder;
 import org.junit.runners.model.Statement;
+import org.junit.runners.model.Store;
 import org.junit.runners.model.TestClass;
 
 /**
@@ -69,8 +72,14 @@ import org.junit.runners.model.TestClass;
  * @see <a href="http://web.archive.org/web/20110608210825/http://shareandenjoy.saff.net/tdd-specifications.pdf">Paper on Theories</a>
  */
 public class Theories extends BlockJUnit4ClassRunner {
+    @Deprecated
     public Theories(Class<?> klass) throws InitializationError {
         super(klass);
+    }
+
+    /** @since 4.13 */
+    public Theories(Class<?> testClass, RunnerBuilder runnerBuilder) throws InitializationError {
+        super(testClass, runnerBuilder);
     }
 
     @Override
@@ -162,7 +171,7 @@ public class Theories extends BlockJUnit4ClassRunner {
 
     @Override
     public Statement methodBlock(final FrameworkMethod method) {
-        return new TheoryAnchor(method, getTestClass());
+        return new TheoryAnchor(method, getTestClass(), getStore());
     }
 
     public static class TheoryAnchor extends Statement {
@@ -170,12 +179,18 @@ public class Theories extends BlockJUnit4ClassRunner {
 
         private final FrameworkMethod testMethod;
         private final TestClass testClass;
+        private final Store store;
+        private final List<AssumptionViolatedException> fInvalidParameters = new ArrayList<AssumptionViolatedException>();
 
-        private List<AssumptionViolatedException> fInvalidParameters = new ArrayList<AssumptionViolatedException>();
-
-        public TheoryAnchor(FrameworkMethod testMethod, TestClass testClass) {
+        public TheoryAnchor(FrameworkMethod testMethod, TestClass testClass, Store store) {
             this.testMethod = testMethod;
             this.testClass = testClass;
+            this.store = store;
+        }
+
+        @Deprecated
+        public TheoryAnchor(FrameworkMethod testMethod, TestClass testClass) {
+            this(testMethod, testClass, new HierarchicalStore());
         }
 
         private TestClass getTestClass() {
@@ -215,7 +230,7 @@ public class Theories extends BlockJUnit4ClassRunner {
 
         protected void runWithCompleteAssignment(final Assignments complete)
                 throws Throwable {
-            new BlockJUnit4ClassRunner(getTestClass().getJavaClass()) {
+            new BlockJUnit4ClassRunner(getTestClass().getJavaClass(), store) {
                 @Override
                 protected void collectInitializationErrors(
                         List<Throwable> errors) {

@@ -5,6 +5,8 @@ import static java.util.Collections.unmodifiableList;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.runners.model.HierarchicalStore;
+import org.junit.runners.model.Store;
 import org.junit.runners.model.TestClass;
 
 /**
@@ -21,14 +23,22 @@ public class TestWithParameters {
 
     private final List<Object> parameters;
 
+    private final Store store;
+
     public TestWithParameters(String name, TestClass testClass,
             List<Object> parameters) {
-        notNull(name, "The name is missing.");
-        notNull(testClass, "The test class is missing.");
+        this(name, testClass, parameters, new HierarchicalStore());
+    }
+ 
+    /** @since 4.13 */
+    public TestWithParameters(String name, TestClass testClass,
+            List<Object> parameters,
+            Store store) {
+        this.name = notNull(name, "The name is missing.");
+        this.testClass = notNull(testClass, "The test class is missing.");
         notNull(parameters, "The parameters are missing.");
-        this.name = name;
-        this.testClass = testClass;
         this.parameters = unmodifiableList(new ArrayList<Object>(parameters));
+        this.store = notNull(store, "The store is missing.");
     }
 
     public String getName() {
@@ -41,6 +51,11 @@ public class TestWithParameters {
 
     public List<Object> getParameters() {
         return parameters;
+    }
+
+    /** @since 4.13 */
+    Store getStore() {
+        return store;
     }
 
     @Override
@@ -74,9 +89,10 @@ public class TestWithParameters {
                 + parameters;
     }
 
-    private static void notNull(Object value, String message) {
+    private static <T> T notNull(T value, String message) {
         if (value == null) {
             throw new NullPointerException(message);
         }
+        return value;
     }
 }

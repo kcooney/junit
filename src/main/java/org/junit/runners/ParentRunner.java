@@ -34,10 +34,13 @@ import org.junit.runner.manipulation.Sorter;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.notification.StoppedByUserException;
 import org.junit.runners.model.FrameworkMethod;
+import org.junit.runners.model.HierarchicalStore;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.InvalidTestClassError;
+import org.junit.runners.model.RunnerBuilder;
 import org.junit.runners.model.RunnerScheduler;
 import org.junit.runners.model.Statement;
+import org.junit.runners.model.Store;
 import org.junit.runners.model.TestClass;
 import org.junit.validator.AnnotationsValidator;
 import org.junit.validator.PublicClassValidator;
@@ -63,6 +66,7 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
 
     private final Object childrenLock = new Object();
     private final TestClass testClass;
+    private final Store store;
 
     // Guarded by childrenLock
     private volatile Collection<T> filteredChildren = null;
@@ -78,13 +82,27 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
     };
 
     /**
-     * Constructs a new {@code ParentRunner} that will run {@code @TestClass}
+     * Constructs a new {@code ParentRunner} that will run {@code testClass}
      */
     protected ParentRunner(Class<?> testClass) throws InitializationError {
-        this.testClass = createTestClass(testClass);
-        validate();
+        this(testClass, new HierarchicalStore());
     }
 
+    /**
+     * Constructs a new {@code ParentRunner} that will run {@code testClass} using the given buider.
+     *
+     * @since 4.13
+     */
+    protected ParentRunner(Class<?> testClass, RunnerBuilder builder) throws InitializationError {
+        this(testClass, builder.getStore());
+    }
+
+    ParentRunner(Class<?> testClass, Store store) throws InitializationError {
+        this.testClass = createTestClass(testClass);
+        this.store = store;
+        validate();
+    }
+  
     protected TestClass createTestClass(Class<?> testClass) {
         return new TestClass(testClass);
     }
@@ -307,6 +325,10 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
     //
     // Available for subclasses
     //
+
+    protected final Store getStore() {
+        return store;
+    }
 
     /**
      * Returns a {@link TestClass} object wrapping the class to be executed.
