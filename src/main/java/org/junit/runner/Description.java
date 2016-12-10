@@ -164,11 +164,6 @@ public class Description implements Serializable {
     private final Annotation[] fAnnotations;
     private volatile /* write-once */ Class<?> fTestClass;
 
-    // Below fields added in 4.13
-    private transient WeakReference<Description> parent;
-    private transient Lock lock = new ReentrantLock();
-    private transient /* write-once */ Store store;
-
     private Description(Class<?> clazz, String displayName, Annotation... annotations) {
         this(clazz, displayName, displayName, annotations);
     }
@@ -188,55 +183,19 @@ public class Description implements Serializable {
         this.fAnnotations = annotations;
     }
 
-    Object readResolve() {
-        lock = new ReentrantLock();
-        for (Description child : fChildren) {
-            child.parent = new WeakReference<Description>(this);
-        }
-        return this;
-    }
-
     /**
      * @return a user-understandable label
      */
     public String getDisplayName() {
         return fDisplayName;
     }
-
-    private Description getParentDescription() {
-        return (parent == null) ? null : parent.get();
-    }
  
-    public Store getStore() {
-        Store currentStore = store; /* volatile read */
-        if (currentStore != null) {
-            return currentStore;
-        }
-        
-        lock.lock();
-        try {
-            if (store != null) {
-                return store;
-            }
-            Description parentDescription = getParentDescription();
-            if (parentDescription != null) {
-                store = new HierarchicalStore(parentDescription.getStore());
-            } else {
-                store = new HierarchicalStore();
-            }
-            return store;
-        } finally {
-            lock.unlock();
-        }
-    }
-
     /**
      * Add <code>Description</code> as a child of the receiver.
      *
      * @param description the soon-to-be child.
      */
     public void addChild(Description description) {
-        description.parent = new WeakReference<Description>(this);
         fChildren.add(description);
     }
 

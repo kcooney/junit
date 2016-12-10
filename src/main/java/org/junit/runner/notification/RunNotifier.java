@@ -8,6 +8,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.runner.Description;
 import org.junit.runner.Result;
+import org.junit.runner.Stores;
 
 /**
  * If you write custom runners, you may need to notify JUnit of your progress running tests.
@@ -21,6 +22,7 @@ import org.junit.runner.Result;
 public class RunNotifier {
     private final List<RunListener> listeners = new CopyOnWriteArrayList<RunListener>();
     private volatile boolean pleaseStop = false;
+    private volatile Stores stores = null;
 
     /**
      * Internal use only
@@ -85,6 +87,7 @@ public class RunNotifier {
      * Do not invoke.
      */
     public void fireTestRunStarted(final Description description) {
+        stores = Stores.create(description);
         new SafeNotifier() {
             @Override
             protected void notifyListener(RunListener each) throws Exception {
@@ -103,6 +106,7 @@ public class RunNotifier {
                 each.testRunFinished(result);
             }
         }.run();
+        stores = null;
     }
 
     /**
@@ -245,5 +249,13 @@ public class RunNotifier {
             throw new NullPointerException("Cannot add a null listener");
         }
         listeners.add(0, wrapIfNotThreadSafe(listener));
+    }
+
+    public Stores getStores() {
+        Stores currentStores = stores; // volatile read
+        if (currentStores == null) {
+            throw new IllegalStateException();
+        }
+        return currentStores;
     }
 }
