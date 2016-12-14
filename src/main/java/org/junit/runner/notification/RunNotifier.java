@@ -119,6 +119,12 @@ public class RunNotifier {
      * @since 4.13
      */
     public void fireTestSuiteStarted(final Description description) {
+        Stores currentStores = stores; // volatile read
+        if (currentStores == null) {
+            // Most likely we are in code that is testing a custom runner by calling Runner.run(RunNotifier),
+            // which means we don't get fileTestRunStarted().
+            stores = Stores.create(description);
+        }
         new SafeNotifier() {
             @Override
             protected void notifyListener(RunListener each) throws Exception {

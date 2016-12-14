@@ -15,10 +15,7 @@ public class FrameworkField extends FrameworkMember<FrameworkField> {
     private final Field field;
 
     FrameworkField(Field field) {
-        if (field == null) {
-            throw new NullPointerException(
-                    "FrameworkField cannot be created without an underlying field.");
-        }
+        super(notNull(field, "FrameworkField cannot be created without an underlying field."));
         this.field = field;
     }
 
@@ -29,10 +26,6 @@ public class FrameworkField extends FrameworkMember<FrameworkField> {
 
     public Annotation[] getAnnotations() {
         return field.getAnnotations();
-    }
-
-    public <T extends Annotation> T getAnnotation(Class<T> annotationType) {
-        return field.getAnnotation(annotationType);
     }
 
     @Override

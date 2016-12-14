@@ -22,6 +22,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.internal.MethodSorter;
+import org.junit.rules.FactoryClass;
 
 /**
  * Wraps a class to be run, providing method validation and annotation searching
@@ -82,16 +83,26 @@ public class TestClass implements Annotatable {
     protected static <T extends FrameworkMember<T>> void addToAnnotationLists(T member,
             Map<Class<? extends Annotation>, List<T>> map) {
         for (Annotation each : member.getAnnotations()) {
-            Class<? extends Annotation> type = each.annotationType();
-            List<T> members = getAnnotatedMembers(map, type, true);
-            if (member.isShadowedBy(members)) {
-                return;
+            addAnnotationToAnnotationLists(member, map, each);
+            FactoryClass factoryClass = each.annotationType().getAnnotation(FactoryClass.class);
+            if (factoryClass != null) {
+                member.addSyntheticAnnotation(factoryClass);
+                addAnnotationToAnnotationLists(member, map, factoryClass);
             }
-            if (runsTopToBottom(type)) {
-                members.add(0, member);
-            } else {
-                members.add(member);
-            }
+        }
+    }
+
+    private static <T extends FrameworkMember<T>> void addAnnotationToAnnotationLists(
+            T member, Map<Class<? extends Annotation>, List<T>> map, Annotation annotation) {
+        Class<? extends Annotation> annotationType = annotation.annotationType();
+        List<T> members = getAnnotatedMembers(map, annotationType, true);
+        if (member.isShadowedBy(members)) {
+            return;
+        }
+        if (runsTopToBottom(annotationType)) {
+            members.add(0, member);
+        } else {
+            members.add(member);
         }
     }
 

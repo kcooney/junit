@@ -11,21 +11,25 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.internal.AssumptionViolatedException;
 import org.junit.internal.runners.model.EachTestNotifier;
 import org.junit.internal.runners.statements.RunAfters;
 import org.junit.internal.runners.statements.RunBefores;
+import org.junit.rules.FactoryClass;
+import org.junit.rules.RuleFactory;
 import org.junit.rules.RunRules;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runner.Runner;
+import org.junit.runner.Stores;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.manipulation.Filterable;
 import org.junit.runner.manipulation.NoTestsRemainException;
@@ -33,6 +37,7 @@ import org.junit.runner.manipulation.Sortable;
 import org.junit.runner.manipulation.Sorter;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.notification.StoppedByUserException;
+import org.junit.runners.model.FrameworkMember;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.InvalidTestClassError;
@@ -193,6 +198,7 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
             statement = withBeforeClasses(statement);
             statement = withAfterClasses(statement);
             statement = withClassRules(statement);
+            statement = withRuleFactories(statement, notifier.getStores());
         }
         return statement;
     }
@@ -238,13 +244,42 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
      * annotated with {@link ClassRule}.
      *
      * @param statement the base statement
-     * @return a RunRules statement if any class-level {@link Rule}s are
-     *         found, or the base statement
+     * @return a statement that runs the rules
      */
-    private Statement withClassRules(Statement statement) {
-        List<TestRule> classRules = classRules();
-        return classRules.isEmpty() ? statement :
-                new RunRules(statement, classRules, getDescription());
+    private Statement withClassRules(final Statement statement) {
+        return new Statement() {
+            @Override
+            public void evaluate() throws Throwable {
+                new RunRules(statement, classRules(), getDescription()).evaluate();
+            }
+        };
+    }
+
+    private Statement withRuleFactories(final Statement statement, Stores stores) {
+        return new Statement() {
+            @Override
+            public void evaluate() throws Throwable {
+                Set<Class<RuleFactory>> ruleFactoryClasses = new LinkedHashSet<Class<RuleFactory>>();
+                ruleFactoryClasses.addAll(toRuleFactoryClasses(testClass.getAnnotatedMethods(FactoryClass.class)));
+                ruleFactoryClasses.addAll(toRuleFactoryClasses(testClass.getAnnotatedFields(FactoryClass.class)));
+                
+                for (Class<RuleFactory> ruleFactoryClass : ruleFactoryClasses) {
+                    
+                }
+                statement.evaluate();
+            }
+        };
+    }
+
+    private static <T extends FrameworkMember<T>> Set<Class<RuleFactory>> toRuleFactoryClasses(
+            List<T> members) throws InstantiationException, IllegalAccessException {
+        Set<Class<RuleFactory>> result = new LinkedHashSet<Class<RuleFactory>>(members.size());
+        for (FrameworkMember<?> frameworkMember : members) {
+            if (frameworkMember.isStatic()) {
+                result.add(frameworkMember.getAnnotation(FactoryClass.class).value());
+            }
+        }
+        return result;
     }
 
     /**

@@ -23,10 +23,7 @@ public class FrameworkMethod extends FrameworkMember<FrameworkMethod> {
      * Returns a new {@code FrameworkMethod} for {@code method}
      */
     public FrameworkMethod(Method method) {
-        if (method == null) {
-            throw new NullPointerException(
-                    "FrameworkMethod cannot be created without an underlying method.");
-        }
+        super(notNull(method, "FrameworkMethod cannot be created without an underlying method."));
         this.method = method;
     }
 
@@ -185,14 +182,6 @@ public class FrameworkMethod extends FrameworkMember<FrameworkMethod> {
      */
     public Annotation[] getAnnotations() {
         return method.getAnnotations();
-    }
-
-    /**
-     * Returns the annotation of type {@code annotationType} on this method, if
-     * one exists.
-     */
-    public <T extends Annotation> T getAnnotation(Class<T> annotationType) {
-        return method.getAnnotation(annotationType);
     }
 
     @Override

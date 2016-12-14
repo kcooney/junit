@@ -6,9 +6,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.junit.runner.Description;
+import org.junit.runner.JUnitCore;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
-import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.Statement;
@@ -25,10 +25,10 @@ public class CustomBlockJUnit4ClassRunnerTest {
 	@Test
 	public void exceptionsFromMethodBlockMustNotResultInUnrootedTests() throws Exception {
 		TrackingRunListener listener = new TrackingRunListener();
-		RunNotifier notifier = new RunNotifier();
-		notifier.addListener(listener);
+		JUnitCore junit = new JUnitCore();
+		junit.addListener(listener);
 
-		new CustomBlockJUnit4ClassRunner(CustomBlockJUnit4ClassRunnerTestCase.class).run(notifier);
+		junit.run(new CustomBlockJUnit4ClassRunner(CustomBlockJUnit4ClassRunnerTestCase.class));
 		assertEquals("tests started.", 2, listener.testStartedCount.get());
 		assertEquals("tests failed.", 1, listener.testFailureCount.get());
 		assertEquals("tests finished.", 2, listener.testFinishedCount.get());
