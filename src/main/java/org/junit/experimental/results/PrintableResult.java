@@ -43,7 +43,7 @@ public class PrintableResult {
         this(new FailureList(failures).result());
     }
 
-    private PrintableResult(Result result) {
+    public PrintableResult(Result result) {
         this.result = result;
     }
 

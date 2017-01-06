@@ -1,17 +1,24 @@
 package org.junit.rules;
 
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
 import static org.junit.experimental.results.PrintableResult.testResult;
 import static org.junit.experimental.results.ResultMatchers.isSuccessful;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.Test;
+import org.junit.experimental.results.PrintableResult;
 import org.junit.runner.Description;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Request;
+import org.junit.runner.Result;
 import org.junit.runner.RunWith;
+import org.junit.runner.notification.RunListener;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
@@ -97,6 +104,8 @@ public class BlockJUnit4ClassRunnerOverrideTest {
      * executed.
      */
     public static class OverrideCreateTestRunner extends BlockJUnit4ClassRunner {
+        static List<String> log = new ArrayList<String>();
+
         public OverrideCreateTestRunner(final Class<?> klass) throws InitializationError {
             super(klass);
 
@@ -105,6 +114,7 @@ public class BlockJUnit4ClassRunnerOverrideTest {
 
         @Override
         protected Object createTest(FrameworkMethod method) {
+            log.add("createTest()");
             final OverrideCreateTest obj = new OverrideCreateTest();
 
             obj.method = method;
@@ -130,9 +140,29 @@ public class BlockJUnit4ClassRunnerOverrideTest {
 
     @Test
     public void overrideCreateTestMethod() {
-        assertThat(testResult(OverrideCreateTest.class), isSuccessful());
-    }
+        Request request = Request.aClass(OverrideCreateTest.class);
+        JUnitCore junit = new JUnitCore();
+        junit.addListener(new RunListener() {
+            @Override
+            public void testStarted(Description description) throws Exception {
+                OverrideCreateTestRunner.log.add("testStarted()");
+            }
 
+            @Override
+            public void testFinished(Description description) throws Exception {
+                OverrideCreateTestRunner.log.add("testFinished()");
+            }
+        });
+
+        OverrideCreateTestRunner.log.clear();
+        Result result = junit.run(request);
+
+        assertThat(new PrintableResult(result), isSuccessful());
+        assertEquals(
+                asList("testStarted()", "createTest()", "testFinished()",
+                        "testStarted()", "createTest()", "testFinished()"),
+                OverrideCreateTestRunner.log);
+    }
 
     /**
      * Runner for testing override of {@link org.junit.runners.BlockJUnit4ClassRunner#createTest()}

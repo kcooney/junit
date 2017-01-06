@@ -78,13 +78,17 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
         if (isIgnored(method)) {
             notifier.fireTestIgnored(description);
         } else {
-            Statement statement;
-            try {
-                statement = methodBlock(method);
-            }
-            catch (Throwable ex) {
-                statement = new Fail(ex);
-            }
+            /*
+             * Wrap the call to methodBlock() in a statement, so we do not
+             * try to create the test instance until after the runners have
+             * been notified that the test has started.
+             */
+            Statement statement = new Statement() {
+                @Override
+                public void evaluate() throws Throwable {
+                    methodBlock(method).evaluate();
+                }
+            };
             runLeaf(statement, description, notifier);
         }
     }
