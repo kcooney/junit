@@ -5,6 +5,7 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -50,6 +51,16 @@ public class Suite extends ParentRunner<Runner> {
         Class<?>[] value();
     }
 
+    /**
+     * Factory for creating runners.
+     *
+     * @since 4.13
+     */
+    public interface RunnersFactory {
+        /** Creates the runners for the children of the suite. */
+        List<Runner> createRunners();
+    }
+
     private static Class<?>[] getAnnotatedClasses(Class<?> klass) throws InitializationError {
         SuiteClasses annotation = klass.getAnnotation(SuiteClasses.class);
         if (annotation == null) {
@@ -58,7 +69,7 @@ public class Suite extends ParentRunner<Runner> {
         return annotation.value();
     }
 
-    private final List<Runner> runners;
+    private final RunnersFactory factory;
 
     /**
      * Called reflectively on classes annotated with <code>@RunWith(Suite.class)</code>
@@ -107,15 +118,62 @@ public class Suite extends ParentRunner<Runner> {
      *
      * @param klass root of the suite
      * @param runners for each class in the suite, a {@link Runner}
+     *
+     * @since 4.13
+     */
+    protected Suite(Class<?> klass, RunnersFactory factory) throws InitializationError {
+        super(klass);
+        if (factory == null) {
+            throw new NullPointerException("factory cannot be null");
+        }
+        this.factory = new CachingRunnersFactory(factory);
+    }
+
+    private static class CachingRunnersFactory implements RunnersFactory {
+        private final RunnersFactory delegate;
+        private volatile List<Runner> runners;
+
+        CachingRunnersFactory(RunnersFactory delegate) {
+            this.delegate = delegate;
+        }
+
+        public List<Runner> createRunners() {
+            if (runners == null) {
+                runners = makeImmutableCopy(delegate.createRunners());
+            }
+            return runners;
+        }
+    }
+
+    /**
+     * Called by this class and subclasses once the runners making up the suite have been determined
+     *
+     * @param klass root of the suite
+     * @param runners for each class in the suite, a {@link Runner}
      */
     protected Suite(Class<?> klass, List<Runner> runners) throws InitializationError {
         super(klass);
-        this.runners = Collections.unmodifiableList(runners);
+        if (runners == null) {
+            throw new NullPointerException("runners cannot be null");
+        }
+        this.factory = new ListRunnersFactory(runners);
     }
 
+    private static class ListRunnersFactory implements RunnersFactory {
+        private final List<Runner> runners;
+
+        ListRunnersFactory(List<Runner> runners) {
+            this.runners = makeImmutableCopy(runners);
+        }
+
+        public List<Runner> createRunners() {
+            return runners;
+        }
+    }
+    
     @Override
     protected List<Runner> getChildren() {
-        return runners;
+        return factory.createRunners();
     }
 
     @Override
@@ -126,5 +184,9 @@ public class Suite extends ParentRunner<Runner> {
     @Override
     protected void runChild(Runner runner, final RunNotifier notifier) {
         runner.run(notifier);
+    }
+
+    private static <T> List<T> makeImmutableCopy(List<T> items) {
+        return Collections.unmodifiableList(new ArrayList<T>(items));
     }
 }
