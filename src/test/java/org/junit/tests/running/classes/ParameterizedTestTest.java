@@ -200,10 +200,7 @@ public class ParameterizedTestTest {
     static public class BadNumberOfAnnotatedFieldTest {
         @Parameters
         public static Collection<Object[]> data() {
-            return Arrays.asList(new Object[][] {
-                    { 0, 0 },
-                    { 1, 0 },
-                    { 2, 0 } });
+            return Arrays.asList(new Object[][]{{0, 0}});
         }
 
         @Parameter(0)
@@ -224,71 +221,9 @@ public class ParameterizedTestTest {
     @Test
     public void numberOfFieldsAndParametersShouldMatch() {
         Result result = JUnitCore.runClasses(BadNumberOfAnnotatedFieldTest.class);
-        assertEquals(3, result.getFailureCount());
-        List<Failure> failures = result.getFailures();
-        assertTrue(failures.get(0).getException().getMessage().contains(
-                "Wrong number of parameters and @Parameter fields. "
-                + "@Parameter fields counted: 1, available parameters: 2."));
-    }
-
-    @RunWith(Parameterized.class)
-    static public class BadNumberOfParametersInjectingFieldsTest {
-        @Parameters
-        public static Collection<Object[]> data() {
-            return Arrays.asList(new Object[][] {
-                    { 0 },
-                    { 0, 0 },
-                    { 1 } });
-        }
-
-        @Parameter(0)
-        public int fInput;
-
-        @Test
-        public void test() {
-        }
-    }
-
-    @Test
-    public void shouldFailForBadNumberOfParametersWhenInjectingFields() {
-        Result result = JUnitCore.runClasses(BadNumberOfParametersInjectingFieldsTest.class);
-        assertEquals(3, result.getRunCount());
         assertEquals(1, result.getFailureCount());
         List<Failure> failures = result.getFailures();
-        assertTrue(failures.get(0).getException().getMessage().contains(
-                "Wrong number of parameters and @Parameter fields. "
-                + "@Parameter fields counted: 1, available parameters: 2."));
-    }
-
-    @RunWith(Parameterized.class)
-    static public class BadNumberOfParametersInjectingConstructorTest {
-        @Parameters
-        public static Collection<Object[]> data() {
-            return Arrays.asList(new Object[][] {
-                    { 0 },
-                    { 0, 0 },
-                    { 1 } });
-        }
-
-        public BadNumberOfParametersInjectingConstructorTest(int input) {
-            fInput = input;
-        }
-
-        public final int fInput;
-
-        @Test
-        public void test() {
-        }
-    }
-
-    @Test
-    public void shouldFailForBadNumberOfParametersWhenInjectingConstructor() {
-        Result result = JUnitCore.runClasses(BadNumberOfParametersInjectingConstructorTest.class);
-        assertEquals(3, result.getRunCount());
-        assertEquals(1, result.getFailureCount());
-        List<Failure> failures = result.getFailures();
-        assertTrue(failures.get(0).getException().getMessage().contains(
-                "wrong number of arguments"));
+        assertTrue(failures.get(0).getException().getMessage().contains("Wrong number of parameters and @Parameter fields. @Parameter fields counted: 1, available parameters: 2."));
     }
 
     private static String fLog;
@@ -640,10 +575,9 @@ public class ParameterizedTestTest {
         }
     }
 
+    @Test(expected = InitializationError.class)
     public void exceptionWhenPrivateConstructor() throws Throwable {
-        Result result= JUnitCore.runClasses(PrivateConstructor.class);
-        assertEquals(4, result.getRunCount());
-        assertEquals(4, result.getFailureCount());
+        new Parameterized(PrivateConstructor.class);
     }
 
     @RunWith(Parameterized.class)
