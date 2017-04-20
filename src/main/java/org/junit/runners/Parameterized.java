@@ -13,8 +13,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.internal.runners.ErrorReportingRunner;
 import org.junit.runner.Runner;
 import org.junit.runners.model.FrameworkMethod;
+import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.InvalidTestClassError;
 import org.junit.runners.model.TestClass;
 import org.junit.runners.parameterized.BlockJUnit4ClassRunnerWithParametersFactory;
@@ -270,7 +272,8 @@ public class Parameterized extends Suite {
         this(klass, new RunnersFactory(klass));
     }
 
-    private Parameterized(Class<?> klass, RunnersFactory runnersFactory) throws Exception {
+    private Parameterized(Class<?> klass, RunnersFactory runnersFactory)
+            throws InitializationError {
         super(klass, runnersFactory.createRunners());
         validateBeforeParamAndAfterParamMethods(runnersFactory.parameterCount);
     }
@@ -305,27 +308,26 @@ public class Parameterized extends Suite {
         private static final ParametersRunnerFactory DEFAULT_FACTORY = new BlockJUnit4ClassRunnerWithParametersFactory();
 
         private final TestClass testClass;
-        private final FrameworkMethod parametersMethod;
         private final List<Object> allParameters;
         private final int parameterCount;
-
+        private final Parameters parametersAnnotation;
+        private final ParametersRunnerFactory runnerFactory;
 
         private RunnersFactory(Class<?> klass) throws Throwable {
             testClass = new TestClass(klass);
-            parametersMethod = getParametersMethod(testClass);
-            allParameters = allParameters(testClass, parametersMethod);
+            allParameters = allParameters(testClass);
             parameterCount =
                     allParameters.isEmpty() ? 0 : normalizeParameters(allParameters.get(0)).length;
+            parametersAnnotation = getParametersMethod(testClass).getAnnotation(Parameters.class);
+            runnerFactory = getParametersRunnerFactory(testClass);
         }
 
-        private List<Runner> createRunners() throws Exception {
-            Parameters parameters = parametersMethod.getAnnotation(Parameters.class);
+        public List<Runner> createRunners() {
             return Collections.unmodifiableList(createRunnersForParameters(
-                    allParameters, parameters.name(),
-                    getParametersRunnerFactory()));
+                    allParameters, parametersAnnotation.name(), runnerFactory));
         }
 
-        private ParametersRunnerFactory getParametersRunnerFactory()
+        private static ParametersRunnerFactory getParametersRunnerFactory(TestClass testClass)
                 throws InstantiationException, IllegalAccessException {
             UseParametersRunnerFactory annotation = testClass
                     .getAnnotation(UseParametersRunnerFactory.class);
@@ -339,7 +341,8 @@ public class Parameterized extends Suite {
         }
 
         private TestWithParameters createTestWithNotNormalizedParameters(
-                String pattern, int index, Object parametersOrSingleParameter) {
+                String pattern, int index, Object parametersOrSingleParameter)
+                throws MessageFormatException {
             Object[] parameters = normalizeParameters(parametersOrSingleParameter);
             return createTestWithParameters(testClass, pattern, index, parameters);
         }
@@ -350,9 +353,8 @@ public class Parameterized extends Suite {
         }
 
         @SuppressWarnings("unchecked")
-        private static List<Object> allParameters(
-                TestClass testClass, FrameworkMethod parametersMethod) throws Throwable {
-            Object parameters = parametersMethod.invokeExplosively(null);
+        private static List<Object> allParameters(TestClass testClass) throws Throwable {
+            Object parameters = getParametersMethod(testClass).invokeExplosively(null);
             if (parameters instanceof List) {
                 return (List<Object>) parameters;
             } else if (parameters instanceof Collection) {
@@ -366,7 +368,7 @@ public class Parameterized extends Suite {
             } else if (parameters instanceof Object[]) {
                 return Arrays.asList((Object[]) parameters);
             } else {
-                throw parametersMethodReturnedWrongType(testClass, parametersMethod);
+                throw parametersMethodReturnedWrongType(testClass);
             }
         }
 
@@ -385,49 +387,57 @@ public class Parameterized extends Suite {
 
         private List<Runner> createRunnersForParameters(
                 Iterable<Object> allParameters, String namePattern,
-                ParametersRunnerFactory runnerFactory) throws Exception {
-            try {
-                List<TestWithParameters> tests = createTestsForParameters(
-                        allParameters, namePattern);
-                List<Runner> runners = new ArrayList<Runner>();
-                for (TestWithParameters test : tests) {
-                    runners.add(runnerFactory
-                            .createRunnerForTestWithParameters(test));
-                }
-                return runners;
-            } catch (ClassCastException e) {
-                throw parametersMethodReturnedWrongType(testClass, parametersMethod);
-            }
-        }
-
-        private List<TestWithParameters> createTestsForParameters(
-                Iterable<Object> allParameters, String namePattern)
-                throws Exception {
+                ParametersRunnerFactory runnerFactory) {
             int i = 0;
-            List<TestWithParameters> children = new ArrayList<TestWithParameters>();
+            List<Runner> runners = new ArrayList<Runner>();
             for (Object parametersOfSingleTest : allParameters) {
-                children.add(createTestWithNotNormalizedParameters(namePattern,
-                        i++, parametersOfSingleTest));
+                try {
+                    TestWithParameters test = createTestWithNotNormalizedParameters(
+                            namePattern, i++, parametersOfSingleTest);
+                    runners.add(createRunnerForTestWithParameters(runnerFactory, test));
+                } catch (MessageFormatException e) {
+                    runners.add(new ErrorReportingRunner(testClass.getJavaClass(), e));
+                }
             }
-            return children;
+            return runners;
         }
 
-        private static Exception parametersMethodReturnedWrongType(
-                TestClass testClass, FrameworkMethod parametersMethod) throws Exception {
+        private Runner createRunnerForTestWithParameters(
+                ParametersRunnerFactory runnerFactory, TestWithParameters test) {
+            try {
+                return runnerFactory.createRunnerForTestWithParameters(test);
+            } catch (Throwable e) {
+                return new ErrorReportingRunner(testClass.getJavaClass(), e);
+            }
+        }
+
+        private static Exception parametersMethodReturnedWrongType(TestClass testClass) throws Exception {
             String className = testClass.getName();
-            String methodName = parametersMethod.getName();
+            String methodName = getParametersMethod(testClass).getName();
             String message = MessageFormat.format(
                     "{0}.{1}() must return an Iterable of arrays.", className,
                     methodName);
             return new Exception(message);
         }
 
+        private static class MessageFormatException extends Exception {
+            private static final long serialVersionUID = 1L;
+
+            MessageFormatException(String message, IllegalArgumentException cause) {
+                super(message, cause);
+            }
+        }
         private TestWithParameters createTestWithParameters(
                 TestClass testClass, String pattern, int index,
-                Object[] parameters) {
+                Object[] parameters) throws MessageFormatException {
             String finalPattern = pattern.replaceAll("\\{index\\}",
                     Integer.toString(index));
-            String name = MessageFormat.format(finalPattern, parameters);
+            String name;
+            try {
+                name = MessageFormat.format(finalPattern, parameters);
+            } catch (IllegalArgumentException e) {
+                throw new MessageFormatException("Could not format [" + pattern + "]", e);
+            }
             return new TestWithParameters("[" + name + "]", testClass,
                     Arrays.asList(parameters));
         }
