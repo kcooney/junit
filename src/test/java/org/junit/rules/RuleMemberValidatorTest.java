@@ -29,6 +29,9 @@ public class RuleMemberValidatorTest {
     public static class TestWithProtectedClassRule {
         @ClassRule
         protected static TestRule temporaryFolder = new TemporaryFolder();
+
+        @Test
+        public void doesNothing() {}
     }
 
     @Test
@@ -41,6 +44,9 @@ public class RuleMemberValidatorTest {
     public static class TestWithNonStaticClassRule {
         @ClassRule
         public TestRule temporaryFolder = new TemporaryFolder();
+
+        @Test
+        public void doesNothing() {}
     }
 
     @Test

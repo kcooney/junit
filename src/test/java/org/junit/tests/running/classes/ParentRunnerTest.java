@@ -137,6 +137,9 @@ public class ParentRunnerTest {
     static class NonPublicTestClass {
         public NonPublicTestClass() {
         }
+ 
+        @Test
+        public void doesNothing() {}
     }
 
     @Test

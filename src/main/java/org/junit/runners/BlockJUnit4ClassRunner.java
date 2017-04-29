@@ -133,6 +133,17 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
     protected void collectInitializationErrors(List<Throwable> errors) {
         super.collectInitializationErrors(errors);
 
+//        validateNoNonStaticInnerClass(errors);
+//        validateConstructor(errors);
+//        validateInstanceMethods(errors);
+//        validateFields(errors);
+//        validateMethods(errors);
+    }
+
+    @Override
+    protected void collectClassInitializationErrors(List<Throwable> errors) {
+        super.collectClassInitializationErrors(errors);
+
         validateNoNonStaticInnerClass(errors);
         validateConstructor(errors);
         validateInstanceMethods(errors);

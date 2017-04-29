@@ -2,6 +2,7 @@ package org.junit.tests.running.methods;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,11 +14,16 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Request;
+import org.junit.runner.Result;
 import org.junit.runner.RunWith;
+import org.junit.runner.notification.Failure;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.model.InitializationError;
+import org.junit.tests.running.classes.ParameterizedTestTest.AdditionTest;
 
 @RunWith(Parameterized.class)
 public class ParameterizedTestMethodTest {
@@ -168,12 +174,12 @@ public class ParameterizedTestMethodTest {
     }
 
     private List<Throwable> validateAllMethods(Class<?> clazz) {
-        try {
-            new BlockJUnit4ClassRunner(clazz);
-        } catch (InitializationError e) {
-            return e.getCauses();
+        Result result = JUnitCore.runClasses(clazz);
+        List<Throwable> throwables = new ArrayList<Throwable>();
+        for (Failure failure : result.getFailures()) {
+            throwables.add(failure.getException());
         }
-        return Collections.emptyList();
+        return throwables;
     }
 
     @Test

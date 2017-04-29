@@ -36,6 +36,7 @@ import org.junit.runner.notification.StoppedByUserException;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.InvalidTestClassError;
+import org.junit.runners.model.MultipleFailureException;
 import org.junit.runners.model.RunnerScheduler;
 import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
@@ -121,8 +122,17 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
      * Default implementation adds an error for each method annotated with
      * {@code @BeforeClass} or {@code @AfterClass} that is not
      * {@code public static void} with no arguments.
+     *
+     * <p>WARNING: This method is called from the constructor, so can be called when the
+     * subclass is not fully initialized.
+     *
+     * @deprecated prefer overriding {@link #collectClassInitializationErrors(List)} instead.
      */
+    @Deprecated
     protected void collectInitializationErrors(List<Throwable> errors) {
+    }
+
+    protected void collectClassInitializationErrors(List<Throwable> errors) {
         validatePublicVoidNoArgMethods(BeforeClass.class, true, errors);
         validatePublicVoidNoArgMethods(AfterClass.class, true, errors);
         validateClassRules(errors);
@@ -194,7 +204,7 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
             statement = withAfterClasses(statement);
             statement = withClassRules(statement);
         }
-        return statement;
+        return new RunClassValidation(statement);
     }
 
     private boolean areAllChildrenIgnored() {
@@ -204,6 +214,25 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
             }
         }
         return true;
+    }
+
+    private class RunClassValidation extends Statement {
+        private final Statement next;
+
+        RunClassValidation(Statement nextStatement) {
+            next = nextStatement;
+        }
+
+        @Override
+        public void evaluate() throws Throwable {
+            List<Throwable> errors = new ArrayList<Throwable>();
+            collectClassInitializationErrors(errors);
+            if (errors.isEmpty()) {
+                next.evaluate();
+            } else {
+                throw new InvalidTestClassError(getTestClass().getJavaClass(), errors);
+            }
+        }
     }
 
     /**
@@ -241,10 +270,19 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
      * @return a RunRules statement if any class-level {@link Rule}s are
      *         found, or the base statement
      */
-    private Statement withClassRules(Statement statement) {
-        List<TestRule> classRules = classRules();
-        return classRules.isEmpty() ? statement :
-                new RunRules(statement, classRules, getDescription());
+    private Statement withClassRules(final Statement statement) {
+        return new Statement() {
+            @Override
+            public void evaluate() throws Throwable {
+                List<TestRule> classRules = classRules();
+                if (classRules.isEmpty()) {
+                    statement.evaluate();
+                } else {
+                    RunRules runRules = new RunRules(statement, classRules, getDescription());
+                    runRules.evaluate();
+                }
+            }
+        };
     }
 
     /**
