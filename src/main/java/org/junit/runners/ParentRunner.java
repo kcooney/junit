@@ -12,6 +12,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -35,11 +37,11 @@ import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.notification.StoppedByUserException;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
+import org.junit.runners.model.InvalidTestClassError;
 import org.junit.runners.model.RunnerScheduler;
 import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
 import org.junit.validator.AnnotationsValidator;
-import org.junit.validator.PublicClassValidator;
 import org.junit.validator.TestClassValidator;
 
 /**
@@ -57,10 +59,10 @@ import org.junit.validator.TestClassValidator;
  */
 public abstract class ParentRunner<T> extends Runner implements Filterable,
         Sortable {
-    private static final List<TestClassValidator> VALIDATORS = Arrays.asList(
-            new AnnotationsValidator(), new PublicClassValidator());
+    private static final List<TestClassValidator> VALIDATORS = Arrays.<TestClassValidator>asList(
+            new AnnotationsValidator());
 
-    private final Object childrenLock = new Object();
+    private final Lock childrenLock = new ReentrantLock();
     private final TestClass testClass;
 
     // Guarded by childrenLock
@@ -219,7 +221,7 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
 
     /**
      * Returns a {@link Statement}: run all non-overridden {@code @AfterClass} methods on this class
-     * and superclasses before executing {@code statement}; all AfterClass methods are
+     * and superclasses after executing {@code statement}; all AfterClass methods are
      * always executed: exceptions thrown by previous steps are combined, if
      * necessary, with exceptions from AfterClass methods into a
      * {@link org.junit.runners.model.MultipleFailureException}.
@@ -346,8 +348,16 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
 
     @Override
     public Description getDescription() {
-        Description description = Description.createSuiteDescription(getName(),
-                getRunnerAnnotations());
+        Class<?> clazz = getTestClass().getJavaClass();
+        Description description;
+        // if subclass overrides `getName()` then we should use it
+        // to maintain backwards compatibility with JUnit 4.12
+        if (clazz == null || !clazz.getName().equals(getName())) {
+            description = Description.createSuiteDescription(getName(), getRunnerAnnotations());
+        } else {
+            description = Description.createSuiteDescription(clazz, getRunnerAnnotations());
+        }
+
         for (T child : getFilteredChildren()) {
             description.addChild(describeChild(child));
         }
@@ -358,6 +368,7 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
     public void run(final RunNotifier notifier) {
         EachTestNotifier testNotifier = new EachTestNotifier(notifier,
                 getDescription());
+        testNotifier.fireTestSuiteStarted();
         try {
             Statement statement = classBlock(notifier);
             statement.evaluate();
@@ -367,6 +378,8 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
             throw e;
         } catch (Throwable e) {
             testNotifier.addFailure(e);
+        } finally {
+            testNotifier.fireTestSuiteFinished();
         }
     }
 
@@ -375,7 +388,8 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
     //
 
     public void filter(Filter filter) throws NoTestsRemainException {
-        synchronized (childrenLock) {
+        childrenLock.lock();
+        try {
             List<T> children = new ArrayList<T>(getFilteredChildren());
             for (Iterator<T> iter = children.iterator(); iter.hasNext(); ) {
                 T each = iter.next();
@@ -393,17 +407,22 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
             if (filteredChildren.isEmpty()) {
                 throw new NoTestsRemainException();
             }
+        } finally {
+            childrenLock.unlock();
         }
     }
 
     public void sort(Sorter sorter) {
-        synchronized (childrenLock) {
+        childrenLock.lock();
+        try {
             for (T each : getFilteredChildren()) {
                 sorter.apply(each);
             }
             List<T> sortedChildren = new ArrayList<T>(getFilteredChildren());
             Collections.sort(sortedChildren, comparator(sorter));
             filteredChildren = Collections.unmodifiableCollection(sortedChildren);
+        } finally {
+            childrenLock.unlock();
         }
     }
 
@@ -415,16 +434,19 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
         List<Throwable> errors = new ArrayList<Throwable>();
         collectInitializationErrors(errors);
         if (!errors.isEmpty()) {
-            throw new InitializationError(errors);
+            throw new InvalidTestClassError(testClass.getJavaClass(), errors);
         }
     }
 
     private Collection<T> getFilteredChildren() {
         if (filteredChildren == null) {
-            synchronized (childrenLock) {
+            childrenLock.lock();
+            try {
                 if (filteredChildren == null) {
                     filteredChildren = Collections.unmodifiableCollection(getChildren());
                 }
+            } finally {
+                childrenLock.unlock();
             }
         }
         return filteredChildren;

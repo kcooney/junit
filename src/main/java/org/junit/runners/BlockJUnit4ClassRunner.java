@@ -5,6 +5,7 @@ import static org.junit.internal.runners.rules.RuleMemberValidator.RULE_VALIDATO
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
@@ -29,6 +30,8 @@ import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.MultipleFailureException;
 import org.junit.runners.model.Statement;
+import org.junit.validator.PublicClassValidator;
+import org.junit.validator.TestClassValidator;
 
 /**
  * Implements the JUnit 4 standard test case class model, as defined by the
@@ -55,8 +58,9 @@ import org.junit.runners.model.Statement;
  * @since 4.5
  */
 public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
+    private static TestClassValidator PUBLIC_CLASS_VALIDATOR = new PublicClassValidator();
 
-    private final ConcurrentHashMap<FrameworkMethod, Description> methodDescriptions = new ConcurrentHashMap<FrameworkMethod, Description>();
+    private final ConcurrentMap<FrameworkMethod, Description> methodDescriptions = new ConcurrentHashMap<FrameworkMethod, Description>();
 
     /**
      * Creates a BlockJUnit4ClassRunner to run {@code testClass}
@@ -132,11 +136,18 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
     protected void collectInitializationErrors(List<Throwable> errors) {
         super.collectInitializationErrors(errors);
 
+        validatePublicConstructor(errors);
         validateNoNonStaticInnerClass(errors);
         validateConstructor(errors);
         validateInstanceMethods(errors);
         validateFields(errors);
         validateMethods(errors);
+    }
+
+    private void validatePublicConstructor(List<Throwable> errors) {
+        if (getTestClass().getJavaClass() != null) {
+            errors.addAll(PUBLIC_CLASS_VALIDATOR.validateTestClass(getTestClass()));
+        }
     }
 
     protected void validateNoNonStaticInnerClass(List<Throwable> errors) {
@@ -189,6 +200,7 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
      * Adds to {@code errors} for each method annotated with {@code @Test},
      * {@code @Before}, or {@code @After} that is not a public, void instance
      * method with no arguments.
+     * @deprecated
      */
     @Deprecated
     protected void validateInstanceMethods(List<Throwable> errors) {
@@ -196,7 +208,7 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
         validatePublicVoidNoArgMethods(Before.class, false, errors);
         validateTestMethods(errors);
 
-        if (computeTestMethods().size() == 0) {
+        if (computeTestMethods().isEmpty()) {
             errors.add(new Exception("No runnable methods"));
         }
     }
@@ -253,8 +265,8 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
      * <ul>
      * <li>Invoke {@code method} on the result of {@link #createTest(org.junit.runners.model.FrameworkMethod)}, and
      * throw any exceptions thrown by either operation.
-     * <li>HOWEVER, if {@code method}'s {@code @Test} annotation has the {@code
-     * expecting} attribute, return normally only if the previous step threw an
+     * <li>HOWEVER, if {@code method}'s {@code @Test} annotation has the {@link Test#expected()}
+     * attribute, return normally only if the previous step threw an
      * exception of the correct type, and throw an exception otherwise.
      * <li>HOWEVER, if {@code method}'s {@code @Test} annotation has the {@code
      * timeout} attribute, throw an exception if the previous step takes more
@@ -311,21 +323,22 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
 
     /**
      * Returns a {@link Statement}: if {@code method}'s {@code @Test} annotation
-     * has the {@code expecting} attribute, return normally only if {@code next}
+     * has the {@link Test#expected()} attribute, return normally only if {@code next}
      * throws an exception of the correct type, and throw an exception
      * otherwise.
      */
     protected Statement possiblyExpectingExceptions(FrameworkMethod method,
             Object test, Statement next) {
         Test annotation = method.getAnnotation(Test.class);
-        return expectsException(annotation) ? new ExpectException(next,
-                getExpectedException(annotation)) : next;
+        Class<? extends Throwable> expectedExceptionClass = getExpectedException(annotation);
+        return expectedExceptionClass != null ? new ExpectException(next, expectedExceptionClass) : next;
     }
 
     /**
      * Returns a {@link Statement}: if {@code method}'s {@code @Test} annotation
      * has the {@code timeout} attribute, throw an exception if {@code next}
      * takes more than the specified number of milliseconds.
+     * @deprecated
      */
     @Deprecated
     protected Statement withPotentialTimeout(FrameworkMethod method,
@@ -379,12 +392,13 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
 
     private Statement withMethodRules(FrameworkMethod method, List<TestRule> testRules,
             Object target, Statement result) {
+        Statement withMethodRules = result;
         for (org.junit.rules.MethodRule each : getMethodRules(target)) {
-            if (!testRules.contains(each)) {
-                result = each.apply(result, method, target);
+            if (!(each instanceof TestRule && testRules.contains(each))) {
+                withMethodRules = each.apply(withMethodRules, method, target);
             }
         }
-        return result;
+        return withMethodRules;
     }
 
     private List<org.junit.rules.MethodRule> getMethodRules(Object target) {
@@ -441,10 +455,6 @@ public class BlockJUnit4ClassRunner extends ParentRunner<FrameworkMethod> {
         } else {
             return annotation.expected();
         }
-    }
-
-    private boolean expectsException(Test annotation) {
-        return getExpectedException(annotation) != null;
     }
 
     private long getTimeout(Test annotation) {
